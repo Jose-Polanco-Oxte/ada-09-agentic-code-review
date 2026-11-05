@@ -30,6 +30,13 @@ The Note Management Application is a modular, zero-runtime-dependency web applic
 - **FR-04.4:** The filter operation must reject invalid, empty, or non-string category arguments with a descriptive validation error.
 - **FR-04.5:** The filter operation shall return frozen entities and preserve storage integrity.
 
+### FR-05: Priority-Based Note Filtering
+- **FR-05.1:** The storage repository shall provide an operation `filterByPriority(priority)` to retrieve notes matching a specific valid priority level.
+- **FR-05.2:** Filtered notes must preserve chronological descending sorting (`createdAt` descending).
+- **FR-05.3:** If no notes exist in a valid priority, the operation shall return an empty collection without error (`StorageResult.ok([])`).
+- **FR-05.4:** The filter operation must reject invalid, empty, non-string, or unknown priority arguments with a descriptive validation error (`StorageResult.fail(...)`).
+- **FR-05.5:** The filter operation shall return frozen entities and preserve storage integrity and immutability.
+
 ---
 
 ## Non-Functional Requirements & Architectural Invariants

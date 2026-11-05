@@ -45,6 +45,22 @@
 - **Traceability:** Maps to FR-04.5, NFR-01.1
 - **Criteria:** Modifying the array returned by `filterByCategory()` does not modify internal state. All entities in `data` are frozen.
 
+### AC-05.1: Query by Valid Priority
+- **Traceability:** Maps to FR-05.1, FR-05.2
+- **Criteria:** Given a valid priority string ('baja', 'media', 'alta'), `repo.filterByPriority(priority)` returns a `StorageResult` where `success === true` and every element in `data` has `priority === priority`. The returned elements must be in chronological descending order.
+
+### AC-05.2: Empty Match Handling
+- **Traceability:** Maps to FR-05.3
+- **Criteria:** When filtering by a valid priority that contains zero saved notes, `repo.filterByPriority(priority)` returns `StorageResult.ok([])` with `data.length === 0`.
+
+### AC-05.3: Parameter Validation
+- **Traceability:** Maps to FR-05.4
+- **Criteria:** Calling `filterByPriority()` with `null`, `undefined`, a non-string argument, an empty string, or an unknown priority not in `VALID_PRIORITIES` returns a `StorageResult` with `success === false` and a descriptive error message in `result.error`.
+
+### AC-05.4: Invariant & Immutability Preservation
+- **Traceability:** Maps to FR-05.5, NFR-01.1
+- **Criteria:** Modifying the array returned by `filterByPriority()` does not modify internal state. All entities in `data` are frozen.
+
 ### AC-NFR-01: Prohibition of Deletion Operations
 - **Traceability:** Maps to NFR-01.1, NFR-01.2
 - **Criteria:** Introspecting `Object.getOwnPropertyNames(Object.getPrototypeOf(repo))` confirms that no property or method name contains: `'delete'`, `'remove'`, `'destroy'`, `'clear'`, `'drop'`, `'truncate'`, or `'pop'`.
