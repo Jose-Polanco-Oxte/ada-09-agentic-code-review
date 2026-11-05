@@ -14,7 +14,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function (models) {
   'use strict';
 
-  const { NoteModel, VALID_CATEGORIES } = models;
+  const { NoteModel, VALID_CATEGORIES, VALID_PRIORITIES } = models;
   const STORAGE_KEY = 'ada07_notes_v1';
   const STORAGE_SCHEMA_VERSION = 1;
 
@@ -169,10 +169,9 @@
         return StorageResult.fail('La prioridad debe ser una cadena de texto no vacía.');
       }
 
-      const allowedPriorities = ['baja', 'media', 'alta'];
-      if (!allowedPriorities.includes(priority)) {
+      if (!VALID_PRIORITIES.includes(priority)) {
         return StorageResult.fail(
-          `Prioridad no válida: '${priority}'. Prioridades permitidas: ${allowedPriorities.join(', ')}.`
+          `Prioridad no válida: '${priority}'. Prioridades permitidas: ${VALID_PRIORITIES.join(', ')}.`
         );
       }
 

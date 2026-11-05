@@ -54,3 +54,23 @@ Base commit: b865ee3a441e482d08a3ddc44604ba5c8df8432d
 [x] Ready for independent review
 
 This report is NOT an approval.
+
+---
+
+## Fix Cycle (Post Human Decisions)
+
+### Findings Addressed
+1. **RF-01 (MUST FIX - Architecture & Domain Boundary):**
+   - **Resolution:** Modified `js/storage.js:17` to import `VALID_PRIORITIES` directly from `models.js` (`const { NoteModel, VALID_CATEGORIES, VALID_PRIORITIES } = models;`). Removed local hardcoded array in `NoteRepository.filterByPriority` and bound validation directly to `VALID_PRIORITIES.includes(priority)`.
+2. **RF-02 (MUST FIX - Test Completeness & Immutability / AC-05.4):**
+   - **Resolution:** Implemented automated test `AC-05.4: should preserve entity immutability and ensure modifying the returned array does not mutate repository state` in `tests/notes.test.mjs`. Verified that entities remain deeply frozen and mutating the returned array does not affect subsequent queries.
+3. **RF-03 (OPTIONAL - Type Documentation):**
+   - **Resolution:** Deferred per human review decision; no code changes performed to preserve consistency with existing repository documentation style.
+
+### Post-Fix Verification
+- Command: `powershell -ExecutionPolicy Bypass -File .\scripts\verify_repo.ps1`
+- Test suite: 18/18 tests passed across 5 suites (100% pass rate).
+- Syntax check: PASS.
+- Repository Contract: PASS.
+- Regression check: Zero regressions detected; creation-only invariant and all prior tests fully preserved.
+

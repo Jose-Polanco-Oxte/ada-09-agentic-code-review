@@ -389,4 +389,42 @@ describe('Query & Filtering: NoteRepository Priority Filtering (FR-05)', () => {
       assert.ok(result.error.length > 0);
     }
   });
+
+  it('AC-05.4: should preserve entity immutability and ensure modifying the returned array does not mutate repository state', () => {
+    const repo = new NoteRepository();
+
+    const note = NoteModel.create({
+      title: 'Nota Prioridad Alta Inmutable',
+      category: 'General',
+      priority: 'alta',
+      content: 'Probando integridad e inmutabilidad en filtro de prioridad'
+    });
+    repo.saveNote(note);
+
+    const filterResult = repo.filterByPriority('alta');
+    assert.equal(filterResult.success, true);
+    assert.equal(filterResult.data.length, 1);
+
+    const retrievedNote = filterResult.data[0];
+
+    // Entities must remain frozen
+    assert.equal(Object.isFrozen(retrievedNote), true);
+    assert.throws(() => {
+      // @ts-ignore
+      retrievedNote.priority = 'baja';
+    }, TypeError);
+
+    // Modifying the returned array must not alter repository internal state
+    filterResult.data.push({ fake: 'note' });
+    filterResult.data.pop();
+    filterResult.data.pop();
+    assert.equal(filterResult.data.length, 0);
+
+    // Subsequent retrieval must remain intact
+    const freshResult = repo.filterByPriority('alta');
+    assert.equal(freshResult.success, true);
+    assert.equal(freshResult.data.length, 1);
+    assert.equal(freshResult.data[0].id, note.id);
+    assert.equal(freshResult.data[0].title, 'Nota Prioridad Alta Inmutable');
+  });
 });
