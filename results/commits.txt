@@ -1,2 +1,3 @@
-﻿96ffddd fix: address ADA-09 review findings
+﻿aaaba4b docs(ada-09): record re-review report, PR evidence, AI usage log, and reflections
+96ffddd fix: address ADA-09 review findings
 b817422 feat: implement CR-02 priority filtering
