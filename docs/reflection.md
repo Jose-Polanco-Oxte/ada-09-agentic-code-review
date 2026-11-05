@@ -67,12 +67,6 @@ Reutilizaría cuatro artefactos fundamentales:
 
 ---
 
-**Estudiante:** José Antonio Polanco Oxté  
-**Asignatura:** Ingeniería de Software asistida por IA · UADY  
-**Institución:** Universidad Autónoma de Yucatán  
-
----
-
 # ADA-08: Agent-Ready Repository
 
 ### 1. ¿Cuál fue el principal obstáculo para el agente en la ejecución BEFORE?
