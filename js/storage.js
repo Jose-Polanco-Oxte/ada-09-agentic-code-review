@@ -159,6 +159,38 @@
     }
 
     /**
+     * Filters saved notes by priority.
+     * Preserves chronological descending order (newest first).
+     * @param {string} priority
+     * @returns {StorageResult<Array<import('./models').NoteEntity>>}
+     */
+    filterByPriority(priority) {
+      if (typeof priority !== 'string' || priority.trim().length === 0) {
+        return StorageResult.fail('La prioridad debe ser una cadena de texto no vacía.');
+      }
+
+      const allowedPriorities = ['baja', 'media', 'alta'];
+      if (!allowedPriorities.includes(priority)) {
+        return StorageResult.fail(
+          `Prioridad no válida: '${priority}'. Prioridades permitidas: ${allowedPriorities.join(', ')}.`
+        );
+      }
+
+      const allNotesResult = this.getAllNotes();
+      if (!allNotesResult.success) {
+        return allNotesResult;
+      }
+
+      const allNotes = allNotesResult.data || [];
+      const filtered = allNotes
+        .filter((note) => note.priority === priority)
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .map((note) => (Object.isFrozen(note) ? note : Object.freeze({ ...note })));
+
+      return StorageResult.ok(filtered);
+    }
+
+    /**
      * Persists a newly created note.
      * @param {import('./models').NoteEntity} note
      * @returns {StorageResult<import('./models').NoteEntity>}

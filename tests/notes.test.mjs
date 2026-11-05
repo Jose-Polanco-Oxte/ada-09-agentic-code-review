@@ -304,3 +304,89 @@ describe('Query & Filtering: NoteRepository Category Filtering (FR-04)', () => {
     assert.equal(freshResult.data[0].title, 'Nota para Inmutabilidad');
   });
 });
+
+
+describe('Query & Filtering: NoteRepository Priority Filtering (FR-05)', () => {
+  it('AC-05.1: should retrieve notes matching a valid priority in chronological descending order', async () => {
+    const repo = new NoteRepository();
+
+    const note1 = NoteModel.create({
+      title: 'Nota Prioridad Alta 1',
+      category: 'Trabajo',
+      priority: 'alta',
+      content: 'Primera tarea de alta prioridad'
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 5));
+
+    const note2 = NoteModel.create({
+      title: 'Nota Prioridad Media',
+      category: 'Personal',
+      priority: 'media',
+      content: 'Tarea media que no debe filtrarse'
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 5));
+
+    const note3 = NoteModel.create({
+      title: 'Nota Prioridad Alta 2',
+      category: 'Ideas',
+      priority: 'alta',
+      content: 'Segunda tarea de alta prioridad (más reciente)'
+    });
+
+    repo.saveNote(note1);
+    repo.saveNote(note2);
+    repo.saveNote(note3);
+
+    const result = repo.filterByPriority('alta');
+
+    assert.equal(result.success, true);
+    assert.equal(result.error, undefined);
+    assert.equal(Array.isArray(result.data), true);
+    assert.equal(result.data.length, 2);
+
+    for (const note of result.data) {
+      assert.equal(note.priority, 'alta');
+    }
+
+    assert.equal(result.data[0].id, note3.id);
+    assert.equal(result.data[1].id, note1.id);
+    assert.ok(new Date(result.data[0].createdAt).getTime() >= new Date(result.data[1].createdAt).getTime());
+  });
+
+  it('AC-05.2: should return an empty array without error when a valid priority has no matching notes', () => {
+    const repo = new NoteRepository();
+
+    const emptyResult = repo.filterByPriority('baja');
+    assert.equal(emptyResult.success, true);
+    assert.deepEqual(emptyResult.data, []);
+    assert.equal(emptyResult.data.length, 0);
+  });
+
+  it('AC-05.3: should reject null, undefined, non-string, empty, or unknown priorities with descriptive error', () => {
+    const repo = new NoteRepository();
+
+    const invalidInputs = [
+      null,
+      undefined,
+      123,
+      true,
+      false,
+      {},
+      [],
+      '',
+      '   ',
+      'urgente',
+      'ALTA'
+    ];
+
+    for (const input of invalidInputs) {
+      // @ts-ignore
+      const result = repo.filterByPriority(input);
+      assert.equal(result.success, false);
+      assert.equal(typeof result.error, 'string');
+      assert.ok(result.error.length > 0);
+    }
+  });
+});
