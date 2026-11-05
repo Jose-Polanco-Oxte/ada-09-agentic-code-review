@@ -31,10 +31,19 @@ index 0000000..7514d54
 +Approved by: Antonio Polanco (Lead Software Engineer / Human Reviewer)
 +Date: 2026-11-04
 diff --git a/js/storage.js b/js/storage.js
-index 155ba43..8c0807c 100644
+index 155ba43..35889d2 100644
 --- a/js/storage.js
 +++ b/js/storage.js
-@@ -158,6 +158,38 @@
+@@ -14,7 +14,7 @@
+ })(typeof globalThis !== 'undefined' ? globalThis : this, function (models) {
+   'use strict';
+ 
+-  const { NoteModel, VALID_CATEGORIES } = models;
++  const { NoteModel, VALID_CATEGORIES, VALID_PRIORITIES } = models;
+   const STORAGE_KEY = 'ada07_notes_v1';
+   const STORAGE_SCHEMA_VERSION = 1;
+ 
+@@ -158,6 +158,37 @@
        return StorageResult.ok(filtered);
      }
  
@@ -49,10 +58,9 @@ index 155ba43..8c0807c 100644
 +        return StorageResult.fail('La prioridad debe ser una cadena de texto no vac├¡a.');
 +      }
 +
-+      const allowedPriorities = ['baja', 'media', 'alta'];
-+      if (!allowedPriorities.includes(priority)) {
++      if (!VALID_PRIORITIES.includes(priority)) {
 +        return StorageResult.fail(
-+          `Prioridad no v├ílida: '${priority}'. Prioridades permitidas: ${allowedPriorities.join(', ')}.`
++          `Prioridad no v├ílida: '${priority}'. Prioridades permitidas: ${VALID_PRIORITIES.join(', ')}.`
 +        );
 +      }
 +
@@ -75,10 +83,10 @@ index 155ba43..8c0807c 100644
       * @param {import('./models').NoteEntity} note
 diff --git a/results/coder-report.md b/results/coder-report.md
 new file mode 100644
-index 0000000..816c786
+index 0000000..8cba548
 --- /dev/null
 +++ b/results/coder-report.md
-@@ -0,0 +1,56 @@
+@@ -0,0 +1,76 @@
 +# Coder Agent Report
 +
 +## Change
@@ -135,6 +143,465 @@ index 0000000..816c786
 +[x] Ready for independent review
 +
 +This report is NOT an approval.
++
++---
++
++## Fix Cycle (Post Human Decisions)
++
++### Findings Addressed
++1. **RF-01 (MUST FIX - Architecture & Domain Boundary):**
++   - **Resolution:** Modified `js/storage.js:17` to import `VALID_PRIORITIES` directly from `models.js` (`const { NoteModel, VALID_CATEGORIES, VALID_PRIORITIES } = models;`). Removed local hardcoded array in `NoteRepository.filterByPriority` and bound validation directly to `VALID_PRIORITIES.includes(priority)`.
++2. **RF-02 (MUST FIX - Test Completeness & Immutability / AC-05.4):**
++   - **Resolution:** Implemented automated test `AC-05.4: should preserve entity immutability and ensure modifying the returned array does not mutate repository state` in `tests/notes.test.mjs`. Verified that entities remain deeply frozen and mutating the returned array does not affect subsequent queries.
++3. **RF-03 (OPTIONAL - Type Documentation):**
++   - **Resolution:** Deferred per human review decision; no code changes performed to preserve consistency with existing repository documentation style.
++
++### Post-Fix Verification
++- Command: `powershell -ExecutionPolicy Bypass -File .\scripts\verify_repo.ps1`
++- Test suite: 18/18 tests passed across 5 suites (100% pass rate).
++- Syntax check: PASS.
++- Repository Contract: PASS.
++- Regression check: Zero regressions detected; creation-only invariant and all prior tests fully preserved.
++
+diff --git a/results/commits.txt b/results/commits.txt
+new file mode 100644
+index 0000000..3f0ce2f
+--- /dev/null
++++ b/results/commits.txt
+@@ -0,0 +1 @@
++´╗┐b817422 feat: implement CR-02 priority filtering
+diff --git a/results/human-review-decisions.md b/results/human-review-decisions.md
+new file mode 100644
+index 0000000..0ebdf96
+--- /dev/null
++++ b/results/human-review-decisions.md
+@@ -0,0 +1,28 @@
++# Human Review Decisions
++
++## Change
++CR-02
++
++### RF-01 ÔÇö Architecture & Business-Rule Placement
++- **Reviewer severity:** MUST FIX
++- **Human decision:** ACCEPTED
++- **Reason:** The reviewer correctly proved that hardcoding `['baja', 'media', 'alta']` inside `NoteRepository.filterByPriority` violates the single source of truth and the architectural boundaries stipulated in `ARCHITECTURE.md` (Section 2: Domain Layer owns validation schemas; Persistence imports from Domain). `models.js` already exports `VALID_PRIORITIES`.
++- **Required action:** Import `VALID_PRIORITIES` from `models` in `js/storage.js` and validate incoming priority against `VALID_PRIORITIES.includes(priority)`.
++
++### RF-02 ÔÇö Test Completeness & False Confidence
++- **Reviewer severity:** SHOULD FIX
++- **Human decision:** MODIFIED
++- **Reason:** The reviewer classified the absence of `AC-05.4` test coverage as SHOULD FIX. However, per `SPEC.md` and `ARCHITECTURE.md`, defensive entity immutability (`Object.isFrozen`) and array mutation isolation are core system invariants. A failure here could allow callers to mutate internal repository state silently. As lead software architect, I elevate this finding from SHOULD FIX to MUST FIX.
++- **Final severity:** MUST FIX
++- **Required action:** Add comprehensive automated unit test in `tests/notes.test.mjs` verifying `AC-05.4: should preserve entity immutability and ensure modifying the returned array does not mutate repository state`.
++
++### RF-03 ÔÇö Maintainability & Type Documentation
++- **Reviewer severity:** OPTIONAL
++- **Human decision:** DEFERRED
++- **Reason:** The existing method `filterByCategory` currently uses `@param {string} category`. Changing only `filterByPriority` to union literals creates type documentation inconsistency across the module. A project-wide JSDoc/TypeScript definition migration is planned in the backlog.
++- **Required action:** Defer to future typing improvement task. No blocking action required for CR-02.
++
++## Human Gate
++- [x] Return to coder-agent
++- [ ] Ready for final re-review
++- [ ] Stop / escalate
+diff --git a/results/pr.diff b/results/pr.diff
+new file mode 100644
+index 0000000..74de52a
+--- /dev/null
++++ b/results/pr.diff
+@@ -0,0 +1,256 @@
++´╗┐diff --git a/CHANGE_REQUEST.md b/CHANGE_REQUEST.md
++new file mode 100644
++index 0000000..7514d54
++--- /dev/null
+++++ b/CHANGE_REQUEST.md
++@@ -0,0 +1,26 @@
+++# Change Request
+++
+++Change ID: CR-02
+++
+++## Goal
+++Implement priority-based note filtering (`filterByPriority(priority)`) in `NoteRepository` (`js/storage.js`) to allow retrieving notes matching a specified priority level ('baja', 'media', 'alta'), preserving chronological descending sort order and defensive entity immutability.
+++
+++## Requirements Covered
+++- FR-05 (FR-05.1, FR-05.2, FR-05.3, FR-05.4, FR-05.5)
+++- AC-05 (AC-05.1, AC-05.2, AC-05.3, AC-05.4)
+++- FR-01.5 (Allowed priorities: 'baja', 'media', 'alta')
+++- NFR-01 (Creation-Only Architectural Invariant)
+++
+++## Constraints
+++- Follow AGENTS.md.
+++- Use REQUIREMENTS.md and SPEC.md as the source of truth.
+++- Preserve architecture boundaries.
+++- Do not weaken existing tests.
+++
+++## Verification
+++Automated test suite execution in `tests/notes.test.mjs` verifying AC-05.1 through AC-05.4, code syntax verification via `node --check`, contract validation via `python scripts/check_repo_contract.py`, and unified verification pipeline via `./scripts/verify_repo.ps1` / `./scripts/verify_repo.sh`.
+++
+++## Human Approval
+++Approved to implement: YES
+++Approved by: Antonio Polanco (Lead Software Engineer / Human Reviewer)
+++Date: 2026-11-04
++diff --git a/js/storage.js b/js/storage.js
++index 155ba43..8c0807c 100644
++--- a/js/storage.js
+++++ b/js/storage.js
++@@ -158,6 +158,38 @@
++       return StorageResult.ok(filtered);
++     }
++ 
+++    /**
+++     * Filters saved notes by priority.
+++     * Preserves chronological descending order (newest first).
+++     * @param {string} priority
+++     * @returns {StorageResult<Array<import('./models').NoteEntity>>}
+++     */
+++    filterByPriority(priority) {
+++      if (typeof priority !== 'string' || priority.trim().length === 0) {
+++        return StorageResult.fail('La prioridad debe ser una cadena de texto no vacÔö£┬ía.');
+++      }
+++
+++      const allowedPriorities = ['baja', 'media', 'alta'];
+++      if (!allowedPriorities.includes(priority)) {
+++        return StorageResult.fail(
+++          `Prioridad no vÔö£├¡lida: '${priority}'. Prioridades permitidas: ${allowedPriorities.join(', ')}.`
+++        );
+++      }
+++
+++      const allNotesResult = this.getAllNotes();
+++      if (!allNotesResult.success) {
+++        return allNotesResult;
+++      }
+++
+++      const allNotes = allNotesResult.data || [];
+++      const filtered = allNotes
+++        .filter((note) => note.priority === priority)
+++        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+++        .map((note) => (Object.isFrozen(note) ? note : Object.freeze({ ...note })));
+++
+++      return StorageResult.ok(filtered);
+++    }
+++
++     /**
++      * Persists a newly created note.
++      * @param {import('./models').NoteEntity} note
++diff --git a/results/coder-report.md b/results/coder-report.md
++new file mode 100644
++index 0000000..816c786
++--- /dev/null
+++++ b/results/coder-report.md
++@@ -0,0 +1,56 @@
+++# Coder Agent Report
+++
+++## Change
+++Change ID: CR-02
+++Branch: ada09/cr-02
+++Base commit: b865ee3a441e482d08a3ddc44604ba5c8df8432d
+++
+++## Requirements Covered
+++- FR-05 (FR-05.1, FR-05.2, FR-05.3, FR-05.4, FR-05.5)
+++- AC-05.1
+++- AC-05.2
+++- AC-05.3
+++
+++## Implementation Plan
+++1. Inspect `js/storage.js` and analyze existing `filterByCategory` implementation for consistency.
+++2. Implement `filterByPriority(priority)` in `NoteRepository` validating that `priority` is a non-empty string and one of the allowed priority values.
+++3. Implement in-memory filtering and preserve chronological descending order (`createdAt` descending).
+++4. Add unit tests in `tests/notes.test.mjs` verifying happy path filtering, empty matches, and invalid input rejection.
+++5. Execute repository verification pipeline (`scripts/verify_repo.ps1` / `scripts/verify_repo.sh`) to ensure zero regressions.
+++
+++## Files Changed
+++- `js/storage.js` (added `filterByPriority` method to `NoteRepository`)
+++- `tests/notes.test.mjs` (added test suite for priority filtering)
+++
+++## Tests Added / Updated
+++- `Query & Filtering: NoteRepository Priority Filtering (FR-05)`:
+++  - `AC-05.1: should retrieve notes matching a valid priority in chronological descending order`
+++  - `AC-05.2: should return an empty array without error when a valid priority has no matching notes`
+++  - `AC-05.3: should reject null, undefined, non-string, empty, or unknown priorities with descriptive error`
+++- Total test count: 17 passed, 0 failed.
+++
+++## Commands Executed
+++- `node --check js/models.js js/storage.js js/app.js`
+++- `node --test tests/notes.test.mjs`
+++- `powershell -ExecutionPolicy Bypass -File .\scripts\verify_repo.ps1`
+++
+++## Verification Result
+++- Unit tests: PASS (17 passing, 0 failing)
+++- Syntax checks: PASS
+++- Repository Contract: PASS
+++- Single Verification Pipeline: PASS
+++
+++## Assumptions
+++- Allowed priorities are lowercase strings: `'baja'`, `'media'`, `'alta'`.
+++- Fallback in-memory behavior functions identically to persistent storage for filtering operations.
+++
+++## Known Limitations
+++- UI integration in `index.html` / `js/app.js` is not included in this change request as scope was bounded to the storage layer API.
+++
+++## Self-Check
+++[x] Scope respected
+++[x] Existing tests not weakened
+++[x] No undocumented dependency/API introduced
+++[x] Ready for independent review
+++
+++This report is NOT an approval.
++diff --git a/results/run-context.md b/results/run-context.md
++new file mode 100644
++index 0000000..b057420
++--- /dev/null
+++++ b/results/run-context.md
++@@ -0,0 +1,19 @@
+++# Run Context
+++
+++## Change Request Metadata
+++- **Change ID:** CR-02
+++- **Title:** Priority-Based Note Filtering in NoteRepository
+++- **Branch:** `ada09/cr-02`
+++- **Base Commit:** `b865ee3a441e482d08a3ddc44604ba5c8df8432d`
+++- **Base Commit Summary:** `docs(spec): define FR-05 and AC-05 for priority-based note filtering`
+++- **Base Parent Commit (ADA-08):** `046c91bf260c96af5ed0c91c4c930b46f9732f40` (`feat(ada-08): complete Agent-Ready Repository deliverables, AFTER evaluation, audit and reflections`)
+++- **Target Branch / Integration Base:** `master`
+++
+++## Environment Context
+++- **Operating System:** Windows (NT)
+++- **Node.js Version:** `v24.21.0`
+++- **Python Version:** `Python 3.14.8`
+++- **Verification Runner:** `scripts/verify_repo.ps1` / `scripts/verify_repo.sh`
+++- **Test Framework:** Node.js native test runner (`node:test`, `node:assert/strict`)
+++- **Working Tree Initial State:** Clean working tree with untracked `CHANGE_REQUEST.md`.
+++- **Timestamp:** 2026-11-04T19:06:00-06:00
++diff --git a/tests/notes.test.mjs b/tests/notes.test.mjs
++index 7083770..3b7fefa 100644
++--- a/tests/notes.test.mjs
+++++ b/tests/notes.test.mjs
++@@ -304,3 +304,89 @@ describe('Query & Filtering: NoteRepository Category Filtering (FR-04)', () => {
++     assert.equal(freshResult.data[0].title, 'Nota para Inmutabilidad');
++   });
++ });
+++
+++
+++describe('Query & Filtering: NoteRepository Priority Filtering (FR-05)', () => {
+++  it('AC-05.1: should retrieve notes matching a valid priority in chronological descending order', async () => {
+++    const repo = new NoteRepository();
+++
+++    const note1 = NoteModel.create({
+++      title: 'Nota Prioridad Alta 1',
+++      category: 'Trabajo',
+++      priority: 'alta',
+++      content: 'Primera tarea de alta prioridad'
+++    });
+++
+++    await new Promise((resolve) => setTimeout(resolve, 5));
+++
+++    const note2 = NoteModel.create({
+++      title: 'Nota Prioridad Media',
+++      category: 'Personal',
+++      priority: 'media',
+++      content: 'Tarea media que no debe filtrarse'
+++    });
+++
+++    await new Promise((resolve) => setTimeout(resolve, 5));
+++
+++    const note3 = NoteModel.create({
+++      title: 'Nota Prioridad Alta 2',
+++      category: 'Ideas',
+++      priority: 'alta',
+++      content: 'Segunda tarea de alta prioridad (mÔö£├¡s reciente)'
+++    });
+++
+++    repo.saveNote(note1);
+++    repo.saveNote(note2);
+++    repo.saveNote(note3);
+++
+++    const result = repo.filterByPriority('alta');
+++
+++    assert.equal(result.success, true);
+++    assert.equal(result.error, undefined);
+++    assert.equal(Array.isArray(result.data), true);
+++    assert.equal(result.data.length, 2);
+++
+++    for (const note of result.data) {
+++      assert.equal(note.priority, 'alta');
+++    }
+++
+++    assert.equal(result.data[0].id, note3.id);
+++    assert.equal(result.data[1].id, note1.id);
+++    assert.ok(new Date(result.data[0].createdAt).getTime() >= new Date(result.data[1].createdAt).getTime());
+++  });
+++
+++  it('AC-05.2: should return an empty array without error when a valid priority has no matching notes', () => {
+++    const repo = new NoteRepository();
+++
+++    const emptyResult = repo.filterByPriority('baja');
+++    assert.equal(emptyResult.success, true);
+++    assert.deepEqual(emptyResult.data, []);
+++    assert.equal(emptyResult.data.length, 0);
+++  });
+++
+++  it('AC-05.3: should reject null, undefined, non-string, empty, or unknown priorities with descriptive error', () => {
+++    const repo = new NoteRepository();
+++
+++    const invalidInputs = [
+++      null,
+++      undefined,
+++      123,
+++      true,
+++      false,
+++      {},
+++      [],
+++      '',
+++      '   ',
+++      'urgente',
+++      'ALTA'
+++    ];
+++
+++    for (const input of invalidInputs) {
+++      // @ts-ignore
+++      const result = repo.filterByPriority(input);
+++      assert.equal(result.success, false);
+++      assert.equal(typeof result.error, 'string');
+++      assert.ok(result.error.length > 0);
+++    }
+++  });
+++});
+diff --git a/results/review-contract.md b/results/review-contract.md
+new file mode 100644
+index 0000000..848c656
+--- /dev/null
++++ b/results/review-contract.md
+@@ -0,0 +1,33 @@
++# Review Contract
++
++## Change
++CR-02
++
++## Requirements / Acceptance Criteria
++- **FR-05.1:** `NoteRepository` must expose `filterByPriority(priority)` returning matching notes.
++- **FR-05.2 / AC-05.1:** Returned notes must be sorted in chronological descending order (`createdAt` descending).
++- **FR-05.3 / AC-05.2:** Valid priority with zero matching notes returns `StorageResult.ok([])` with `length === 0`.
++- **FR-05.4 / AC-05.3:** Calling with `null`, `undefined`, non-string, empty string, or value outside `VALID_PRIORITIES` returns `StorageResult.fail(...)`.
++- **FR-05.5 / AC-05.4:** Modifying the returned array must not mutate internal storage state; all returned note entities must be frozen (`Object.isFrozen(note) === true`).
++- **FR-01.5:** Valid priorities are strictly defined as `['baja', 'media', 'alta']`.
++- **NFR-01:** Strictly NO deletion, modification, or removal methods introduced.
++- **NFR-02:** Zero external runtime dependencies.
++
++## Architecture Constraints
++- **Expected dependency flow:** `Presentation (HTML/CSS) -> Application (app.js) -> Domain (models.js) -> Persistence (storage.js)`. Storage layer may only import from Domain (`models.js`).
++- **Business-rule location:** Priority validation schema and allowable constants (`VALID_PRIORITIES`) reside strictly in Domain (`models.js`). Storage layer must consume domain constants rather than defining private copies.
++- **Protected boundaries:** `NoteRepository` must preserve `StorageResult` wrapper pattern (`StorageResult.ok(data)` / `StorageResult.fail(error)`). Immutability of stored entities must be preserved in both standard and in-memory fallback modes.
++
++## Review Rules
++- Verify requirement coverage (all acceptance criteria AC-05.1 through AC-05.4 covered by implementation and tests).
++- Verify every called API/dependency exists in production code without hallucination.
++- Check architecture boundaries (no business rule leaks into storage, no domain duplication).
++- Inspect tests for masking / false confidence (check whether tests actually test edge cases, mutation isolation, and immutability).
++- Check regression behavior (verify existing tests and NFR-01 invariants are fully intact).
++- Identify unnecessary technical debt (duplicate arrays, unverified assumptions).
++- Cite concrete evidence (file name, line number, code snippet) for every finding.
++
++## Severity
++- **MUST FIX:** Requirement violation, regression, security/integrity risk, hallucinated API/dependency, broken architecture constraint, missing core acceptance criteria test, or defect that makes the change unsafe to approve.
++- **SHOULD FIX:** Significant maintainability, coverage, design, or clarity issue that does not block the requested behavior.
++- **OPTIONAL:** Non-blocking improvement outside the minimum acceptance threshold (stylistic, cosmetic, or documentation polish).
+diff --git a/results/review-report.md b/results/review-report.md
+new file mode 100644
+index 0000000..5be0a3d
+--- /dev/null
++++ b/results/review-report.md
+@@ -0,0 +1,91 @@
++# Independent Review Report
++
++## Review Context
++Change ID: CR-02
++Branch / PR: `ada09/cr-02`
++Commit reviewed: `b817422`
++Reviewer agent: `reviewer-agent` (Independent context)
++Model: Gemini 3.8 Flash
++Tools / permissions: Read-only inspection (filesystem inspection without code modification privileges)
++Date: 2026-11-04
++
++## Requirements / Acceptance Criteria Reviewed
++- **FR-05 (FR-05.1, FR-05.2, FR-05.3, FR-05.4, FR-05.5):** Priority-based filtering operation in `NoteRepository`.
++- **AC-05 (AC-05.1, AC-05.2, AC-05.3, AC-05.4):** Acceptance criteria for valid priority retrieval, empty matches, parameter validation, and immutability invariants.
++- **FR-01.5:** Domain definition of valid priorities (`'baja'`, `'media'`, `'alta'`).
++- **NFR-01 (NFR-01.1, NFR-01.2):** Creation-only architectural invariant (no deletion or mutation).
++- **NFR-02:** Zero external runtime dependencies.
++
++## Test Evidence
++- **Automated test suite (`node --test tests/notes.test.mjs`):** 17 tests passed across 5 suites in 160.1ms; 0 failures.
++- **Syntax check (`node --check js/models.js js/storage.js js/app.js`):** PASS, zero lexical errors.
++- **Repository contract check (`python scripts/check_repo_contract.py`):** PASS, all required files, documentation links, and architectural invariants present.
++- **Unified verification pipeline (`scripts/verify_repo.ps1`):** PASS on all three stages.
++
++## MUST FIX
++
++### RF-01 ÔÇö MUST FIX
++- **Category:** Architecture & Business-Rule Placement
++- **Requirement / AC:** AC-05.3, ARCHITECTURE.md (Section 2, Component Responsibilities)
++- **File / Line:** `js/storage.js:167`
++- **Evidence:**
++  ```javascript
++  const allowedPriorities = ['baja', 'media', 'alta'];
++  if (!allowedPriorities.includes(priority)) {
++  ```
++- **Problem:**
++  `js/storage.js` defines a private hardcoded array of priority values instead of consuming `VALID_PRIORITIES` exported from `js/models.js`. Line 17 of `js/storage.js` currently only imports `{ NoteModel, VALID_CATEGORIES } from models;`.
++- **Risk:**
++  Violates Single Source of Truth and architectural layer decoupling. If priority constraints evolve in the domain schema (`js/models.js`), the persistence layer will drift or silently reject valid domain entities.
++- **Recommended next step:**
++  Update line 17 of `js/storage.js` to import `VALID_PRIORITIES` from `models` (`const { NoteModel, VALID_CATEGORIES, VALID_PRIORITIES } = models;`) and validate input directly against `VALID_PRIORITIES.includes(priority)`.
++
++## SHOULD FIX
++
++### RF-02 ÔÇö SHOULD FIX
++- **Category:** Test Completeness & False Confidence
++- **Requirement / AC:** AC-05.4, NFR-01
++- **File / Line:** `tests/notes.test.mjs:321-392`
++- **Evidence:**
++  Suite `Query & Filtering: NoteRepository Priority Filtering (FR-05)` in `tests/notes.test.mjs` defines tests for AC-05.1, AC-05.2, and AC-05.3, but omits an automated assertion suite for AC-05.4 (`should preserve entity immutability and ensure modifying the returned array does not mutate repository state`).
++- **Problem:**
++  Tests produce false confidence: while 17 tests pass in green, the defensive immutability of returned entities and repository array mutation isolation remain unverified for priority queries.
++- **Risk:**
++  A caller could mutate an entity returned by `filterByPriority` or corrupt internal repository state if defensive copying fails in future refactors, without tests catching the regression.
++- **Recommended next step:**
++  Add unit test `AC-05.4: should preserve entity immutability and ensure modifying the returned array does not mutate repository state` asserting `Object.isFrozen(note) === true` and testing array mutation resistance.
++
++## OPTIONAL
++
++### RF-03 ÔÇö OPTIONAL
++- **Category:** Maintainability & Type Documentation
++- **Requirement / AC:** Code Quality / JSDoc Standards
++- **File / Line:** `js/storage.js:162-166`
++- **Evidence:**
++  ```javascript
++  * @param {string} priority
++  ```
++- **Problem:**
++  The JSDoc parameter is typed as generic `string` rather than a union of allowed literals (`'baja' | 'media' | 'alta'`).
++- **Risk:**
++  Low risk; IDEs and TypeScript LSP cannot offer autocomplete hints for priority literals without an explicit union type in JSDoc.
++- **Recommended next step:**
++  Refine JSDoc annotation to `@param {'baja'|'media'|'alta'} priority`.
++
++## Missing Evidence / Open Questions
++None. The code and tests were thoroughly inspected and all necessary context was available in `CHANGE_REQUEST.md`, `SPEC.md`, `ARCHITECTURE.md`, and `results/pr.diff`.
++
++## Final Review Summary
++MUST FIX count: 1
++SHOULD FIX count: 1
++OPTIONAL count: 1
++
++Human decision required:
++YES
++
++## Reviewer Recommendation
++[ ] NOT READY
++[x] READY AFTER MUST FIX
++[ ] READY FOR HUMAN REVIEW
++
++This recommendation is not a merge approval.
 diff --git a/results/run-context.md b/results/run-context.md
 new file mode 100644
 index 0000000..b057420
@@ -160,11 +627,39 @@ index 0000000..b057420
 +- **Test Framework:** Node.js native test runner (`node:test`, `node:assert/strict`)
 +- **Working Tree Initial State:** Clean working tree with untracked `CHANGE_REQUEST.md`.
 +- **Timestamp:** 2026-11-04T19:06:00-06:00
+diff --git a/results/verification-report.md b/results/verification-report.md
+new file mode 100644
+index 0000000..85e5d00
+--- /dev/null
++++ b/results/verification-report.md
+@@ -0,0 +1,22 @@
++# Verification Report
++
++## Change
++CR-02
++
++## Environment
++Python / Node / Java version: Node.js v24.21.0, Python 3.14.8
++Dependencies: 0 runtime dependencies (pure ES2022 / Node.js standard modules)
++Commit reviewed: `b817422` (`feat: implement CR-02 priority filtering`)
++
++## Checks
++
++| Check | Command | Result | Evidence |
++|---|---|---|---|
++| Tests | `node --test tests/notes.test.mjs` | PASS | 17/17 tests passing across 5 suites in 160.1ms; 0 failures. |
++| Lint | `node --check js/models.js js/storage.js js/app.js` | PASS | Exit code 0, no syntax errors or lexical anomalies detected. |
++| Repo contract | `python scripts/check_repo_contract.py` | PASS | All 11 required files present, SPEC references intact, no secrets, no deletion methods. |
++| Security | `python scripts/check_repo_contract.py` (pattern check) | PASS | Zero forbidden files (.env, keys) found, no dangerous primitives detected. |
++| Unified Pipeline | `powershell -ExecutionPolicy Bypass -File .\scripts\verify_repo.ps1` | PASS | Steps 1/3 (tests), 2/3 (syntax), 3/3 (contracts) all succeeded. |
++
++## Overall Gate
++PASS
 diff --git a/tests/notes.test.mjs b/tests/notes.test.mjs
-index 7083770..3b7fefa 100644
+index 7083770..74afdfd 100644
 --- a/tests/notes.test.mjs
 +++ b/tests/notes.test.mjs
-@@ -304,3 +304,89 @@ describe('Query & Filtering: NoteRepository Category Filtering (FR-04)', () => {
+@@ -304,3 +304,127 @@ describe('Query & Filtering: NoteRepository Category Filtering (FR-04)', () => {
      assert.equal(freshResult.data[0].title, 'Nota para Inmutabilidad');
    });
  });
@@ -252,5 +747,43 @@ index 7083770..3b7fefa 100644
 +      assert.equal(typeof result.error, 'string');
 +      assert.ok(result.error.length > 0);
 +    }
++  });
++
++  it('AC-05.4: should preserve entity immutability and ensure modifying the returned array does not mutate repository state', () => {
++    const repo = new NoteRepository();
++
++    const note = NoteModel.create({
++      title: 'Nota Prioridad Alta Inmutable',
++      category: 'General',
++      priority: 'alta',
++      content: 'Probando integridad e inmutabilidad en filtro de prioridad'
++    });
++    repo.saveNote(note);
++
++    const filterResult = repo.filterByPriority('alta');
++    assert.equal(filterResult.success, true);
++    assert.equal(filterResult.data.length, 1);
++
++    const retrievedNote = filterResult.data[0];
++
++    // Entities must remain frozen
++    assert.equal(Object.isFrozen(retrievedNote), true);
++    assert.throws(() => {
++      // @ts-ignore
++      retrievedNote.priority = 'baja';
++    }, TypeError);
++
++    // Modifying the returned array must not alter repository internal state
++    filterResult.data.push({ fake: 'note' });
++    filterResult.data.pop();
++    filterResult.data.pop();
++    assert.equal(filterResult.data.length, 0);
++
++    // Subsequent retrieval must remain intact
++    const freshResult = repo.filterByPriority('alta');
++    assert.equal(freshResult.success, true);
++    assert.equal(freshResult.data.length, 1);
++    assert.equal(freshResult.data[0].id, note.id);
++    assert.equal(freshResult.data[0].title, 'Nota Prioridad Alta Inmutable');
 +  });
 +});

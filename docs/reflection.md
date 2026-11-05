@@ -1,4 +1,71 @@
-# Respuestas a las Preguntas de Reflexión — ADA-08 & ADA-07
+# Respuestas a las Preguntas de Reflexión — ADA-09, ADA-08 & ADA-07
+
+**Estudiante:** José Antonio Polanco Oxté  
+**Asignatura:** Ingeniería de Software asistida por IA · UADY  
+**Institución:** Universidad Autónoma de Yucatán  
+
+---
+
+# ADA-09: Agentic Code Review
+
+### 1. ¿Qué encontró el reviewer-agent que el coder-agent no detectó?
+El reviewer-agent detectó dos fallas estructurales críticas que el coder-agent pasó por alto en su reporte de auto-chequeo:
+1. **Violación de frontera arquitectónica y duplicación de constantes de dominio (RF-01):** El coder-agent hardcodeó dentro del método `filterByPriority` en `js/storage.js` un arreglo local `const allowedPriorities = ['baja', 'media', 'alta']`, en lugar de importar `VALID_PRIORITIES` desde `js/models.js`. El coder-agent se limitó a verificar que el método funcionara funcionalmente, ignorando que `ARCHITECTURE.md` estipula que el dominio es la única fuente de verdad para validaciones de esquema y que la capa de persistencia debe consumir las constantes del dominio.
+2. **Falsa confianza por omisión de pruebas de invariantes (RF-02):** El coder-agent dio por completada la tarea tras lograr 17 tests en verde, omitiendo por completo escribir pruebas automatizadas para el criterio `AC-05.4` (inmutabilidad de entidades retornadas con `Object.isFrozen` y resistencia a la mutación del array de almacenamiento al alterar el array retornado).
+
+### 2. ¿Qué finding fue más difícil de clasificar y por qué?
+El hallazgo **RF-02 (Falta de cobertura del criterio AC-05.4)** fue el más complejo de clasificar:
+- El reviewer-agent lo clasificó inicialmente como **SHOULD FIX**, argumentando que el método en producción ya incluía un `.map(note => Object.freeze(...))` defensivo y que el flujo principal de filtrado funcionaba correctamente.
+- Sin embargo, desde la perspectiva de arquitectura e invariantes del sistema, la inmutabilidad es una promesa no negociable (`NFR-01`). Si no existe un test que intente deliberadamente mutar la propiedad de una entidad o hacer `.pop()` sobre el array de resultados, una regresión futura en la implementación de almacenamiento en memoria o en localStorage podría corromper el estado interno silenciosamente sin romper ningún test existente. Esto generó un debate real sobre si era un tema de "calidad de pruebas" (SHOULD FIX) o de "seguridad e integridad de datos" (MUST FIX).
+
+### 3. ¿Qué finding rechazaste o modificaste como humano y qué evidencia usaste?
+Modifiqué y elevé el hallazgo **RF-02 de SHOULD FIX a MUST FIX**:
+- **Evidencia utilizada:** Contrasté el diff de pruebas en `tests/notes.test.mjs` contra la especificación normativa en `SPEC.md` (`AC-05.4`) y los principios arquitectónicos en `ARCHITECTURE.md` (Sección 3: *"Every note returned or created is deeply frozen with Object.freeze()"*). 
+- **Justificación:** En un sistema de trazabilidad de auditoría append-only, la ausencia de una prueba de inmutabilidad no es una mera sugerencia de estilo o mejora opcional; es una brecha de verificación de un requerimiento no funcional explícito. Permitir el merge de un PR sin prueba automatizada de su invariante central sienta un precedente de degradación de cobertura. Como Human Reviewer, ordené que el Coder Agent implementara obligatoriamente la prueba `AC-05.4` antes de autorizar el readiness.
+
+### 4. ¿Hubo algún test verde que produjera falsa confianza? Explica.
+**Sí, categóricamente.** La suite de pruebas de `filterByPriority` agregada inicialmente por el coder-agent (pruebas para AC-05.1, AC-05.2 y AC-05.3) pasó al 100% (17 tests en verde) y el comando unificado `verify_repo.ps1` reportó `PASS`.
+Esta luz verde produjo una falsa sensación de seguridad porque:
+- Ocultó que la validación de entrada estaba desacoplada de la constante canónica del dominio (`models.js`), dependiendo de un arreglo duplicado en memoria.
+- Ocultó que no existía ninguna aserción que verificara que los objetos retornados estuvieran congelados (`assert.equal(Object.isFrozen(retrievedNote), true)`) ni que mutar el array retornado (`filterResult.data.pop()`) no alterara las notas guardadas en el repositorio.
+Esto demuestra la premisa fundamental del ADA: *"Un cambio no está listo solo porque el código parezca correcto y los tests estén en verde"*.
+
+### 5. ¿Verificaste alguna API o dependencia que parecía plausible? ¿Qué encontraste?
+Sí. Durante la inspección del Review Contract se verificó la importación en la cabecera de `js/storage.js`:
+- El código existente importaba: `const { NoteModel, VALID_CATEGORIES } = models;`.
+- Parecía plausible que `VALID_PRIORITIES` estuviera disponible globalmente o exportada dentro de `NoteModel`. Al inspeccionar `js/models.js`, comprobé que `VALID_PRIORITIES` se exporta en el retorno del módulo UMD (`return { ValidationError, VALID_CATEGORIES, VALID_PRIORITIES, CONSTRAINTS, NoteModel };`), pero **no estaba siendo destructurada ni consumida** en `storage.js`.
+- La solución requerida era simplemente agregar `VALID_PRIORITIES` a la desestructuración de `models` en lugar de inventar nuevas estructuras o suponer que el entorno inyectaría variables globales.
+
+### 6. ¿Qué arquitectura o regla del repositorio fue más útil para la revisión?
+La regla de **"Fronteras de Componentes y Dirección de Dependencias"** de `ARCHITECTURE.md` (Sección 1 y 2):
+- La regla establece una arquitectura unidireccional estricta: `Presentation -> Application -> Domain -> Persistence`.
+- La persistencia (`js/storage.js`) solo tiene permitido depender de las abstracciones del dominio (`js/models.js`), y tiene expresamente prohibido duplicar esquemas de validación o inventar reglas de negocio.
+Tener esta regla formalmente documentada en el repositorio y citada en `results/review-contract.md` permitió justificar objetivamente el hallazgo `RF-01` con evidencia contundente, eliminando cualquier debate de opinión personal o subjetividad estilística.
+
+### 7. ¿Qué problema pudo detectar un check determinista antes que el reviewer-agent?
+El script determinista `scripts/check_repo_contract.py` y `node --check` detectaron inmediatamente la consistencia de archivos y la ausencia de violaciones léxicas críticas:
+- Por ejemplo, si el coder-agent hubiera introducido un método que contuviera la palabra `delete` o `remove`, `check_repo_contract.py` lo habría bloqueado en milisegundos con `exit code 1` en el **Verification Gate**, antes de gastar tokens y tiempo en invocar al Reviewer Agent.
+- Asimismo, la regla del Gate impidió que el reviewer-agent tuviera que verificar manualmente si los tests ejecutaban o si había errores de sintaxis en JavaScript; el gate determinista garantizó que el reviewer recibiera un candidato mecánicamente sano, permitiéndole concentrarse al 100% en semántica, diseño, límites de arquitectura y cobertura real.
+
+### 8. ¿Qué parte del review sigue requiriendo criterio humano?
+El arbitraje de severidad y la gobernanza de riesgos:
+1. **Ponderación del impacto de negocio:** Decidir si una omisión de prueba debe bloquear un release o si puede pasar como deuda técnica aceptable requiere conocimiento del contexto de entrega y tolerancia al riesgo.
+2. **Manejo de inconsistencias y deuda técnica:** En `RF-03` (anotación de tipos en JSDoc), un agente podría haber exigido refactorizar todo el archivo para agregar tipos literales, o haberlo marcado como un bloqueo. El criterio humano determinó que forzar ese cambio en este PR generaba asimetría con el resto del código (`filterByCategory`) y decidió diferirlo formalmente para un refactor global de tipos.
+3. **Autorización final de merge (Human Gate):** El modelo puede sugerir recomendaciones (`READY AFTER MUST FIX`), pero la responsabilidad legal, técnica y ética del cambio ante producción recae exclusivamente en el ingeniero humano.
+
+### 9. ¿Qué technical debt aceptaste o diferiste y por qué?
+Se aceptó y difirió el hallazgo **RF-03 (Tipado literal en JSDoc para el parámetro `priority`)**:
+- **Causa:** La firma actual documenta `@param {string} priority`. Para tener soporte de autocompletado estricto en IDEs, debería ser `@param {'baja'|'media'|'alta'} priority`.
+- **Justificación para diferir:** El método hermano `filterByCategory` documenta `@param {string} category`. Cambiar la convención de documentación únicamente en una función de persistencia genera heterogeneidad. Se documentó en `results/PR_EVIDENCE.md` como deuda técnica consciente para abordarse en una tarea transversal de adopción de JSDoc estricto / TypeScript en todo el proyecto.
+
+### 10. ¿Qué artefactos de este ADA reutilizarías en la Agentic Software Factory final?
+Reutilizaría cuatro artefactos fundamentales:
+1. **`review-contract.md` (Contrato de Revisión):** Es indispensable para alinear al Reviewer Agent sobre qué significa "correcto" antes de que mire el código. Sin este contrato, los LLMs tienden a alucinar preferencias de estilo o emitir comentarios irrelevantes.
+2. **`validate_review_report.py`:** El validador determinista de reportes de PR asegura que cualquier agente revisor entregue un formato estructurado con severidades explícitas, evidencia citada y la bandera de decisión humana obligatoria.
+3. **El pipeline `Verification Gate -> Reviewer Agent -> Human Decision`:** Este patrón desacoplado previene que el agente implementador se convierta en juez y parte de su propio trabajo.
+4. **`PR_EVIDENCE.md`:** La matriz de trazabilidad auditable que conecta Requerimiento -> Código -> Prueba -> Hallazgo de Review -> Decisión Humana. Es el artefacto de cumplimiento por excelencia para auditorías de software generado por IA.
+
+---
 
 **Estudiante:** José Antonio Polanco Oxté  
 **Asignatura:** Ingeniería de Software asistida por IA · UADY  

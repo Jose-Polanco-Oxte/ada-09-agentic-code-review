@@ -1,4 +1,28 @@
-# Bitácora de Uso de IA (AI Usage Log) — ADA-08 & ADA-07
+# Bitácora de Uso de IA (AI Usage Log) — ADA-09, ADA-08 & ADA-07
+
+**Estudiante:** José Antonio Polanco Oxté  
+**Asignatura:** Ingeniería de Software asistida por IA · UADY  
+**Institución:** Universidad Autónoma de Yucatán  
+
+---
+
+# ADA-09: Agentic Code Review
+
+**Fecha:** 2026-11-04  
+**Objetivo:** Ejecutar un ciclo completo de desarrollo y revisión asistido por agentes con separación estricta de roles (Coder Agent -> Verification Gate -> Reviewer Agent -> Human Decision -> Fix -> Re-review -> PR Evidence) sobre el repositorio Agent-Ready.
+
+## Registro de Interacciones Significativas (ADA-09)
+
+| # | Dimensión / Etapa | Solicitud / Actividad Realizada | Propuesta / Comportamiento de la IA | Decisión y Validación Humana (Estudiante) | Impacto Real en el Repositorio |
+| :-: | :--- | :--- | :--- | :--- | :--- |
+| **1** | **Definición / Refinamiento del Change Request (Human Gate 0)** | Formalizar el cambio acotado para ADA-09 en `CHANGE_REQUEST.md` referenciando requisitos existentes. | El agente propuso implementar una funcionalidad amplia de búsqueda full-text y exportación de notas que tocaba DOM, modelos y almacenamiento simultáneamente. | **Acoté y autoricé un cambio estrictamente acotado:** Definí `CR-02` enfocado exclusivamente en filtrado por prioridad (`filterByPriority`) en `NoteRepository` (`js/storage.js`), amarrado a `FR-05`, `AC-05.1` a `AC-05.4`, `FR-01.5` y la invariante `NFR-01`. Autorizado en `CHANGE_REQUEST.md` mediante Human Gate 0. | El cambio se mantuvo dentro de un diff manejable (~100 líneas), enfocado en una sola capa y con criterios 100% testeables. |
+| **2** | **Plan del Coder Agent y Decisión Humana** | Solicitar al Coder Agent un plan de implementación previo a escribir código (`results/coder-report.md`). | El Coder Agent planeó modificar `StorageResult` para agregar metadatos de paginación y crear un helper global de filtrado. | **Rechacé la alteración de contratos existentes:** Recordé al Coder Agent las reglas de `AGENTS.md` (no modificar la firma de `StorageResult`, respetar límites arquitectónicos y no debilitar tests). Validé el plan acotado a añadir el método en `NoteRepository` y suites en `tests/notes.test.mjs`. | Se protegió la compatibilidad hacia atrás y la integridad de las abstracciones del repositorio. |
+| **3** | **Implementación y Manejo de Dependencias** | Implementación del candidato `CR-02` en sesión aislada. | El Coder Agent implementó `filterByPriority(priority)` con ordenamiento cronológico y tests para AC-05.1, AC-05.2 y AC-05.3. Sin embargo, duplicó localmente `allowedPriorities = ['baja', 'media', 'alta']` en `js/storage.js` en lugar de importar `VALID_PRIORITIES` de `models.js`, y omitió los tests de inmutabilidad `AC-05.4`. Todos los tests pasaban en verde (17/17). | **Validé la ejecución determinista en Verification Gate:** Ejecuté `verify_repo.ps1` y `check_repo_contract.py`. Verifiqué que los checks deterministas pasaban porque el código era sintácticamente correcto, pero reservé la detección de la fuga arquitectónica para el Reviewer Agent. | Se generó el candidato revisable (`commit b817422`) y la evidencia en `results/coder-report.md` y `results/verification-report.md`. |
+| **4** | **Revisión Independiente (Reviewer Agent)** | Auditoría independiente de código en subagente aislado de solo lectura con `results/review-contract.md`. | El Reviewer Agent inspeccionó el diff, `SPEC.md` y `ARCHITECTURE.md`, y emitió 3 hallazgos: **RF-01 (MUST FIX)** por violación de frontera de dominio al quemar prioridades en `storage.js:167`; **RF-02 (SHOULD FIX)** por falsa confianza en tests al omitir `AC-05.4` (inmutabilidad y resistencia a mutación de array); y **RF-03 (OPTIONAL)** por tipado JSDoc general (`string` vs union literal). | **Validé la evidencia del Reviewer Agent:** Corrí `validate_review_report.py` sobre `results/review-report.md` confirmando estructura válida y verifiqué que cada hallazgo contenía archivo, línea, fragmento de código, riesgo y acción correctiva exacta. | Se obtuvo un reporte de auditoría objetivo, fundamentado en el contrato de revisión y sin sesgo del implementador. |
+| **5** | **Decisión Humana (Human Review - Human Gate)** | Evaluar y tomar decisiones de gobernanza sobre los hallazgos en `results/human-review-decisions.md`. | La IA sugirió aceptar automáticamente la clasificación del reviewer sin intervención. | **Apliqué criterio de ingeniería y gobernanza:** Acepté `RF-01` (MUST FIX); **modifiqué y elevé `RF-02` de SHOULD FIX a MUST FIX** porque la inmutabilidad de entidades es un invariante crítico del sistema (`NFR-01`/`AC-05.4`); y **diferí `RF-03`** como deuda técnica documentada para no romper la uniformidad con `filterByCategory`. | Se ejerció el rol Human-in-the-loop, demostrando que la decisión final nunca se delega al modelo. |
+| **6** | **Fix Cycle & Re-review (Cierre de Calidad)** | Coder Agent corrige los hallazgos autorizados y Reviewer Agent re-inspecciona la rama. | El Coder Agent importó `VALID_PRIORITIES` en `js/storage.js:17`, corrigió la validación en línea 172 y añadió el test `AC-05.4` en `tests/notes.test.mjs` (18/18 tests verdes). El Reviewer Agent inspeccionó el diff de solución (`commit 96ffddd`) y marcó RF-01 y RF-02 como **RESOLVED**. | **Validé el estado final y autoricé readiness:** Confirmé en `results/re-review-report.md` que no existían regresiones ni métodos de eliminación prohibidos (`NFR-01`), y emití el dictamen **READY FOR HUMAN MERGE** en `results/PR_EVIDENCE.md`. | Se completó el ciclo auditable con trazabilidad total requisito-código-test-finding-decisión. |
+
+---
 
 **Estudiante:** José Antonio Polanco Oxté  
 **Asignatura:** Ingeniería de Software asistida por IA · UADY  
